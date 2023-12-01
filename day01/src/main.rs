@@ -48,9 +48,8 @@ fn main() -> anyhow::Result<()> {
     let part2: u64 = input
         .iter()
         .flat_map(|line| {
-            let line = line.to_lowercase();
-            let first = &first_regex.captures(&line)?[1];
-            let second = &last_regex.captures(&line)?[1];
+            let first = &first_regex.captures(line)?[1];
+            let second = &last_regex.captures(line)?[1];
 
             let first = values[first];
             let second = values[second];
