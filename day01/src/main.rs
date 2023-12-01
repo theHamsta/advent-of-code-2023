@@ -4,8 +4,8 @@ use itertools::Itertools;
 use regex::Regex;
 
 fn main() -> anyhow::Result<()> {
-    let input = include_str!("../input.txt")
-        //let input = include_str!("../input/example1.txt")
+    let input = include_str!("../input")
+        //let input = include_str!("../input/example2.txt")
         .lines()
         .filter(|l| !l.is_empty())
         .collect_vec();
