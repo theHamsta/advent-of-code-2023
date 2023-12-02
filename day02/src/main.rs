@@ -16,7 +16,7 @@ struct Game {
 
 fn main() -> anyhow::Result<()> {
     let input = include_str!("../input")
-    //let input = include_str!("../example1")
+        //let input = include_str!("../example1")
         .lines()
         .filter(|l| !l.is_empty())
         .collect_vec();
@@ -62,22 +62,16 @@ fn main() -> anyhow::Result<()> {
     let part2: u64 = games
         .iter()
         .map(|g| {
-            let red = g
-                .bags
+            ["red", "green", "blue"]
                 .iter()
-                .filter_map(|b| Some(b.get("red")?.number))
-                .max().unwrap_or(0);
-            let green = g
-                .bags
-                .iter()
-                .filter_map(|b| Some(b.get("green")?.number))
-                .max().unwrap_or(0);
-            let blue = g
-                .bags
-                .iter()
-                .filter_map(|b| Some(b.get("blue")?.number))
-                .max().unwrap_or(0);
-            red * green * blue
+                .map(|&color| {
+                    g.bags
+                        .iter()
+                        .filter_map(|b| Some(b.get(color)?.number))
+                        .max()
+                        .unwrap_or(0)
+                })
+                .product::<u64>()
         })
         .sum();
 
