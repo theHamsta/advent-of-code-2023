@@ -1,14 +1,10 @@
-use std::{
-    collections::{HashMap, HashSet},
-    process::exit,
-};
+use std::collections::HashMap;
 
 use itertools::Itertools;
 use regex::Regex;
 
 #[derive(Debug)]
 struct Dict {
-    dest: String,
     dict: HashMap<i64, (i64, i64)>,
 }
 
@@ -39,13 +35,7 @@ fn main() -> anyhow::Result<()> {
                 let length = map[3].parse::<i64>().unwrap();
                 dict.insert(src_start, (dst_start, length));
             }
-            dicts.insert(
-                title[1].to_string(),
-                Dict {
-                    dest: title[2].to_string(),
-                    dict,
-                },
-            );
+            dicts.insert(title[1].to_string(), Dict { dict });
         }
     }
 
@@ -80,15 +70,14 @@ fn main() -> anyhow::Result<()> {
     dbg!(&part1);
 
     let mut min = i64::max_value();
-    let total_seeds = (seeds[0]..(seeds[0] + seeds[1]))
-        .chain(seeds[2]..(seeds[2] + seeds[3]))
-        .count();
-    for (i, s) in (seeds[0]..(seeds[0] + seeds[1]))
-        .chain(seeds[2]..(seeds[2] + seeds[3]))
+    let total_seeds = seeds.chunks(2).flat_map(|v| v[0]..(v[0] + v[1])).count();
+    for (i, s) in seeds
+        .chunks(2)
+        .flat_map(|v| v[0]..(v[0] + v[1]))
         .enumerate()
     {
-        if i % 1000 == 0 {
-            println!("{:.02}", i as f32 / total_seeds as f32 * 100.0);
+        if i % 100000 == 0 {
+            println!("{:.01}", i as f32 / total_seeds as f32 * 100.0);
         }
         let mut cur = s;
         for m in mapping_chain {
