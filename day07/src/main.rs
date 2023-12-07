@@ -66,14 +66,12 @@ fn main() -> anyhow::Result<()> {
     rounds.sort_by(|a, b| a.card.cmp(&b.card));
     rounds.sort_by(|a, b| a.unsorted.cmp(&b.unsorted));
 
-    dbg!(&rounds);
-
-    let part1: u64 = rounds
+    let part2: u64 = rounds
         .iter()
         .enumerate()
         .map(|(i, r)| (i + 1) as u64 * r.bid)
         .sum();
-    dbg!(&part1);
+    dbg!(&part2);
 
     let mut rounds = card_regex
         .captures_iter(raw_input)
@@ -124,8 +122,6 @@ fn main() -> anyhow::Result<()> {
 
     rounds.sort_by(|a, b| a.card.cmp(&b.card));
     rounds.sort_by(|a, b| a.unsorted.cmp(&b.unsorted));
-
-    dbg!(&rounds);
 
     let part1: u64 = rounds
         .iter()
