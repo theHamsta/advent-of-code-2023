@@ -3,16 +3,6 @@ use std::collections::HashMap;
 use itertools::Itertools;
 use regex::Regex;
 
-#[derive(Debug, Eq, PartialEq, PartialOrd, Ord)]
-enum Kind {
-    High,
-    One,
-    Pair,
-    Tripple,
-    TwoPair,
-    FiveOfAKind,
-}
-
 #[derive(Debug)]
 struct Round {
     card: [u32; 5],
