@@ -20,11 +20,92 @@ fn is_allowed(delta: (i64, i64), cur: char) -> bool {
     }
 }
 
+type Point = (i64, i64);
+type PointSet = HashSet<(i64, i64)>;
+type PointVec = Vec<(i64, i64)>;
+
+fn floodfill(
+    copy: &[Vec<char>],
+    input: &[Vec<char>],
+    visited: &HashMap<Point, (u64, Vec<Option<Point>>)>,
+    start_set: PointVec,
+) -> PointSet {
+    let mut outside = HashSet::new();
+
+    let mut stack = start_set;
+    while let Some((x, y)) = stack.pop() {
+        if !(y >= 0 && y < input.len() as i64 && x >= 0 && x < input[0].len() as i64) {
+            continue;
+        }
+
+        let cur = copy[y as usize][x as usize];
+        if outside.contains(&(x, y)) || visited.contains_key(&(x, y)) {
+            continue;
+        }
+
+        match cur {
+            '.' => {
+                stack.push((x - 1, y));
+                stack.push((x + 1, y));
+                stack.push((x, y - 1));
+                stack.push((x, y + 1));
+            }
+            _ => {
+                continue;
+            }
+        }
+
+        outside.insert((x, y));
+    }
+    outside
+        .iter()
+        .copied()
+        .filter(|(x, y)| input[*y as usize][*x as usize] == '.')
+        .collect()
+}
+
+fn backtrack(
+    input: &[Vec<char>],
+    visited: &HashMap<(i64, i64), (u64, Vec<Option<(i64, i64)>>)>,
+    start: (i64, i64),
+) -> (PointVec, PointVec) {
+    let mut cur = start;
+    let mut left_neightbors = Vec::new();
+    let mut right_neightbors = Vec::new();
+
+    while let Some(prev) = visited[&cur].1[0] {
+        let (x, y) = cur;
+        let cur_char = input[y as usize][x as usize];
+        let delta = (x - prev.0, y - prev.1);
+        let (dx, dy) = delta;
+        let right = (x - dy, y + dx);
+        let left = (x + dy, y - dx);
+
+        left_neightbors.push(left);
+        right_neightbors.push(right);
+        match (dx, dy, cur_char) {
+            (-1, 0, 'L') => left_neightbors.push((x + dx, y + dy)),
+            (-1, 0, 'F') => right_neightbors.push((x + dx, y + dy)),
+            (1, 0, '7') => left_neightbors.push((x + dx, y + dy)),
+            (1, 0, 'J') => right_neightbors.push((x + dx, y + dy)),
+            (0, -1, 'F') => left_neightbors.push((x + dx, y + dy)),
+            (0, -1, '7') => right_neightbors.push((x + dx, y + dy)),
+            (0, 1, 'J') => left_neightbors.push((x + dx, y + dy)),
+            (0, 1, 'L') => right_neightbors.push((x + dx, y + dy)),
+            _ => (),
+        }
+
+        cur = prev;
+    }
+    (left_neightbors, right_neightbors)
+}
+
 fn main() -> anyhow::Result<()> {
     let raw_input = include_str!("../input");
     //let raw_input = include_str!("../example1");
     //let raw_input = include_str!("../example2");
     //let raw_input = include_str!("../example3");
+    //let raw_input = include_str!("../example4");
 
     let input = raw_input
         .lines()
@@ -46,6 +127,10 @@ fn main() -> anyhow::Result<()> {
     let mut max_dist = (starting_position, 0u64);
     let mut visited: HashMap<(i64, i64), (u64, Vec<Option<(i64, i64)>>)> = HashMap::new();
 
+    // well, not sure if they really left, right or vice versa
+    let mut right_neightbors = Vec::new();
+    let mut left_neightbors = Vec::new();
+
     while let Some(((x, y), dist, prev)) = stack.pop_front() {
         if !(y >= 0 && y < input.len() as i64 && x >= 0 && x < input[0].len() as i64) {
             continue;
@@ -54,9 +139,17 @@ fn main() -> anyhow::Result<()> {
         if let Some(prev) = prev {
             let delta = (x - prev.0, y - prev.1);
             if !is_allowed(delta, cur) {
-                dbg!(&prev);
-                dbg!(&cur);
                 continue;
+            }
+
+            // right_neightbors would be more correct but I'm gonna assume that there at least one
+            // - | at inner tiles
+            if cur == '-' || cur == '|' {
+                let (dx, dy) = delta;
+                let left = (x - dy, y + dx);
+                left_neightbors.push(left);
+                let right = (x + dy, y - dx);
+                right_neightbors.push(right);
             }
         }
 
@@ -110,7 +203,9 @@ fn main() -> anyhow::Result<()> {
                 stack.push_back(((x, y + 1), next_dist, Some((x, y))));
             }
             //. is ground; there is no pipe in this tile.
-            _ => continue,
+            _ => {
+                continue;
+            }
         }
         visited.insert((x, y), (dist, vec![prev]));
         if dist > max_dist.1 {
@@ -119,6 +214,9 @@ fn main() -> anyhow::Result<()> {
     }
     let part1 = visited.values().map(|v| v.0).max().unwrap();
     dbg!(&part1);
+    assert_eq!(max_dist.1, part1);
+    let loop_ends = &visited[&max_dist.0];
+    assert_eq!(loop_ends.1.len(), 2);
     assert_eq!(max_dist.1, part1);
 
     let mut copy = input.clone();
@@ -137,82 +235,43 @@ fn main() -> anyhow::Result<()> {
         }
     }
 
-    let mut outside = HashSet::new();
+    // change copy/copy to copy/input to just count '.' enclosed by loops
+    let (a, b) = backtrack(&input, &visited, visited[&max_dist.0].1[0].unwrap());
+    let (b2, a2) = backtrack(&input, &visited, visited[&max_dist.0].1[1].unwrap());
 
-    let mut stack = border_starters;
-    while let Some((x, y)) = stack.pop() {
-        if !(y >= 0 && y < input.len() as i64 && x >= 0 && x < input[0].len() as i64) {
-            continue;
-        }
-
-        let cur = copy[y as usize][x as usize];
-        if outside.contains(&(x, y)) || visited.contains_key(&(x, y)) {
-            continue;
-        }
-
-        match cur {
-            '.' => {
-                stack.push((x - 1, y));
-                stack.push((x + 1, y));
-                stack.push((x, y - 1));
-                stack.push((x, y + 1));
-            }
-            _ => {
-                continue;
-            }
-        }
-
-        outside.insert((x, y));
-    }
-    // 498
-    let total = copy[0].len() * copy.len();
-    let inside = total - visited.len() - outside.len();
-    let part2 = inside;
+    let outside = floodfill(&copy, &copy, &visited, border_starters.clone());
+    let mut left = floodfill(&copy, &copy, &visited, a.clone());
+    let mut right = floodfill(&copy, &copy, &visited, b.clone());
+    left.extend(floodfill(&copy, &copy, &visited, a2.clone()));
+    right.extend(floodfill(&copy, &copy, &visited, b2.clone()));
 
     for y in 0..copy.len() {
         for x in 0..copy[0].len() {
-            if outside.contains(&(x as i64, y as i64)) {
-                copy[y][x] = 'O';
-            }
-        }
-    }
-
-    dbg!(&part2);
-    for y in 0..copy.len() {
-        for x in 0..copy[0].len() {
-            print!("{}", copy[y][x]);
-        }
-        println!();
-    }
-    println!();
-
-    let mut count = 0;
-    for y in 0..copy.len() {
-        for x in 0..copy[0].len() {
-            if copy[y][x] == '.' {
-                count += 1;
-            }
-        }
-    }
-    for y in 0..copy.len() {
-        for x in 0..copy[0].len() {
-            if copy[y][x] == 'V' {
-                count += 1;
-                print!("{}", input[y][x]);
+            if left.contains(&(x as i64, y as i64)) && right.contains(&(x as i64, y as i64)) {
+                print!("X");
+            } else if left.contains(&(x as i64, y as i64)) {
+                print!("A");
+            } else if right.contains(&(x as i64, y as i64)) {
+                print!("B");
+            } else if visited.contains_key(&(x as i64, y as i64)) {
+                print!("V");
             } else {
-                print!("{}", copy[y][x]);
+                print!("{}", input[y][x]);
             }
         }
         println!();
     }
-    println!("{count}");
+    dbg!(&left.len());
+    dbg!(&right.len());
+
+    let part2 = if outside.intersection(&left).next().is_some() {
+        assert!(outside.intersection(&right).next().is_none());
+        right.len()
+    } else {
+        assert!(outside.intersection(&left).next().is_none());
+        right.len()
+    };
+    dbg!(&part2);
 
     Ok(())
 }
-
-//fn parts_fit(delta: (dx,dy), cur: char, prev_2: Option<char>) -> bool {
-//match (delta, cur, prev) {
-//((-1,0), ''
-
-//}
-//}
