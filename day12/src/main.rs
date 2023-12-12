@@ -5,14 +5,14 @@ use itertools::Itertools;
 #[derive(Debug, Hash)]
 struct Row {
     chars: String,
-    spec: Vec<u64>,
+    spec: Vec<u8>,
 }
 
 fn num_arrangements<'cache>(
     chars: &'cache mut [u8],
-    spec: &'cache mut [u64],
+    spec: &'cache mut [u8],
     must_pound: bool,
-    cache: &mut HashMap<(Vec<u8>, Vec<u64>, bool), u64>,
+    cache: &mut HashMap<(Vec<u8>, Vec<u8>, bool), u64>,
 ) -> u64 {
     if chars.is_empty() {
         if spec.is_empty() {
