@@ -3,16 +3,16 @@ use std::collections::{HashMap, HashSet, VecDeque};
 use itertools::Itertools;
 
 #[derive(Debug, Hash)]
-struct Row<'a> {
-    chars: &'a str,
+struct Row {
+    chars: String,
     spec: Vec<u64>,
 }
 
-fn num_arrangements(
-    chars: &mut [u8],
-    spec: &mut [u64],
+fn num_arrangements<'cache>(
+    chars: &'cache mut [u8],
+    spec: &'cache mut [u64],
     must_pound: bool,
-    cache: &mut HashMap<Row, u64>,
+    cache: &mut HashMap<(Vec<u8>, Vec<u64>, bool), u64>,
 ) -> u64 {
     if chars.is_empty() {
         if spec.is_empty() {
@@ -22,8 +22,12 @@ fn num_arrangements(
         }
     }
 
+    if let Some(res) = cache.get(&(chars.to_vec(), spec.to_vec(), must_pound)) {
+        return *res;
+    }
+
     //dbg!(String::from_utf8(chars.to_vec()).unwrap());
-    match chars[0] {
+    let res = match chars[0] {
         b'?' => {
             chars[0] = b'#';
             let mut rtn = num_arrangements(chars, spec, must_pound, cache);
@@ -65,7 +69,13 @@ fn num_arrangements(
             }
         }
         _ => unreachable!(),
-    }
+    };
+
+    let char_vec = chars.to_vec();
+    let spec_vec = spec.to_vec();
+    cache.insert((char_vec, spec_vec, must_pound), res);
+
+    res
 }
 
 fn main() -> anyhow::Result<()> {
@@ -82,7 +92,7 @@ fn main() -> anyhow::Result<()> {
         .map(|i| {
             let mut s = i.split(' ');
             Row {
-                chars: s.next().unwrap(),
+                chars: s.next().unwrap().to_string(),
                 spec: s
                     .next()
                     .unwrap()
@@ -97,19 +107,52 @@ fn main() -> anyhow::Result<()> {
     let part1 = rows
         .iter_mut()
         .map(|n| {
-            dbg!(&n);
+            //dbg!(&n);
             let rtn = num_arrangements(
                 &mut n.chars.as_bytes().iter().copied().collect_vec(),
                 &mut n.spec.clone(),
                 false,
                 &mut cache,
             );
-            dbg!(&rtn);
+            //dbg!(&rtn);
             rtn
         })
         .sum::<u64>();
     dbg!(&part1);
-    //9390
+
+    let mut changed_rows = rows
+        .iter()
+        .map(|r| {
+            let mut chars = String::new();
+            let mut spec = Vec::new();
+            for i in 0..5 {
+                chars.push_str(&r.chars);
+                if i != 4 {
+                    chars.push('?');
+                }
+                spec.extend(&r.spec);
+            }
+            Row { chars, spec }
+        })
+        .collect_vec();
+
+    let mut cache = HashMap::new();
+    let part2 = changed_rows
+        .iter_mut()
+        .enumerate()
+        .map(|(i, n)| {
+            dbg!(i);
+            let rtn = num_arrangements(
+                &mut n.chars.as_bytes().iter().copied().collect_vec(),
+                &mut n.spec.clone(),
+                false,
+                &mut cache,
+            );
+            rtn
+        })
+        .sum::<u64>();
+    dbg!(&part2);
+    //16840235814410
 
     Ok(())
 }
