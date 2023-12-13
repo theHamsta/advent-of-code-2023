@@ -1,9 +1,11 @@
-use std::collections::{HashMap, HashSet, VecDeque};
+use std::collections::HashSet;
 
 use itertools::Itertools;
 
-fn calc_reflection_sum(input: &[Vec<char>]) -> u64 {
+fn calc_reflection_sum(input: &[Vec<char>]) -> (u64, Vec<u64>, Vec<u64>) {
     let mut sum = 0u64;
+    let mut x_reflections = Vec::new();
+    let mut y_reflections = Vec::new();
 
     for y in 0..(input.len() as i64) {
         let mut is_symetric = true;
@@ -24,6 +26,7 @@ fn calc_reflection_sum(input: &[Vec<char>]) -> u64 {
         }
         if is_symetric && has_one_comparision {
             sum += (y as u64 + 1) * 100;
+            y_reflections.push(y as u64 + 1);
         }
     }
 
@@ -46,17 +49,16 @@ fn calc_reflection_sum(input: &[Vec<char>]) -> u64 {
         }
         if is_symetric && has_one_comparision {
             sum += x as u64 + 1;
+
+            x_reflections.push(x as u64 + 1);
         }
     }
-    sum
+    (sum, x_reflections, y_reflections)
 }
 
 fn main() -> anyhow::Result<()> {
     let raw_input = include_str!("../input");
     //let raw_input = include_str!("../example1");
-    //let raw_input = include_str!("../example2");
-    //let raw_input = include_str!("../example3");
-    //let raw_input = include_str!("../example4");
 
     let input = raw_input
         .split("\n\n")
@@ -67,8 +69,47 @@ fn main() -> anyhow::Result<()> {
         })
         .collect_vec();
 
-    let part1: u64 = input.iter().map(|i| calc_reflection_sum(i)).sum();
+    let part1: u64 = input.iter().map(|i| calc_reflection_sum(i).0).sum();
     dbg!(&part1);
+
+    let part2: u64 = input
+        .clone()
+        .iter_mut()
+        .map(|i| {
+            let (_, orig_x, orig_y) = calc_reflection_sum(i);
+
+            for y in 0..i.len() {
+                for x in 0..i[0].len() {
+                    let orig = i[y][x];
+                    i[y][x] = match i[y][x] {
+                        '#' => continue,
+                        '.' => '#',
+                        _ => unreachable!(),
+                    };
+                    let (_, new_x, new_y) = calc_reflection_sum(i);
+                    //dbg!(&new_x);
+                    //dbg!(&new_y);
+                    let is_smudge = (!new_x.is_empty() || !new_y.is_empty())
+                        && (new_x != orig_x || new_y != orig_y);
+
+                    if is_smudge {
+                        let old_x: HashSet<_> = orig_x.iter().collect();
+                        let old_y: HashSet<_> = orig_y.iter().collect();
+                        let mut sum: u64 = new_x.iter().filter(|x| !old_x.contains(x)).sum();
+                        sum += new_y.iter().filter(|y| !old_y.contains(y)).sum::<u64>() * 100;
+                        return sum;
+                    }
+
+                    i[y][x] = orig;
+                }
+            }
+
+            println!();
+            panic!("No smudge found")
+        })
+        .sum();
+    dbg!(&part2);
+    //61669
 
     Ok(())
 }
