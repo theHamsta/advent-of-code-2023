@@ -1,4 +1,4 @@
-use std::collections::{HashMap, HashSet, VecDeque};
+use std::collections::HashMap;
 
 use itertools::Itertools;
 
@@ -38,6 +38,7 @@ fn tilt(input: &mut Vec<Vec<char>>, direction: (i64, i64)) {
     }
 }
 
+#[allow(dead_code)]
 fn plot(input: &Vec<Vec<char>>) {
     for y in 0..input.len() {
         for x in 0..input[0].len() {
@@ -50,7 +51,7 @@ fn plot(input: &Vec<Vec<char>>) {
 
 fn main() -> anyhow::Result<()> {
     let raw_input = include_str!("../input");
-    let raw_input = include_str!("../example1");
+    //let raw_input = include_str!("../example1");
 
     let input = raw_input
         .split("\n\n")
@@ -85,20 +86,31 @@ fn main() -> anyhow::Result<()> {
 
     let mut shifted = input.clone();
 
-    let num_iterations = 3;
-    //let num_iterations = 1000000000;
+    let mut already_seen = HashMap::new();
+    //let mut num_iterations = 3;
+    let num_iterations = 1000000000;
+
     for shifted in shifted.iter_mut() {
-        plot(shifted);
-        let before_it = shifted.clone();
-        for i in 0..num_iterations {
+        //plot(shifted);
+        let mut i = 0i64;
+        while i < num_iterations {
             tilt(shifted, (0, -1));
             tilt(shifted, (-1, 0));
             tilt(shifted, (0, 1));
             tilt(shifted, (1, 0));
-            plot(shifted);
-        }
-        if before_it == *shifted {
-            break;
+
+            let before = already_seen.get(shifted);
+            if let Some(j) = before {
+                let cycle_length = i - j;
+
+                // one day I will understand division
+                while i + cycle_length < num_iterations {
+                    i += cycle_length;
+                }
+            } else {
+                already_seen.insert(shifted.clone(), i);
+            }
+            i += 1;
         }
     }
     //plot(&shifted);
