@@ -100,8 +100,8 @@ fn main() -> anyhow::Result<()> {
             tilt(shifted, (1, 0));
 
             let before = already_seen.get(shifted);
-            if let Some(j) = before {
-                let cycle_length = i - j;
+            if let Some(before) = before {
+                let cycle_length = i - before;
 
                 // one day I will understand division
                 while i + cycle_length < num_iterations {
