@@ -130,13 +130,13 @@ fn main() -> anyhow::Result<()> {
         &mut energized,
     );
 
-    let mut energized_map = input.clone();
+    //let mut energized_map = input.clone();
 
     let part1 = energized
         .iter()
         .map(|state| state.pos)
         .unique()
-        .inspect(|pos| energized_map[pos.1 as usize][pos.0 as usize] = '#')
+        //.inspect(|pos| energized_map[pos.1 as usize][pos.0 as usize] = '#')
         .count();
     dbg!(&part1);
 
@@ -166,13 +166,11 @@ fn main() -> anyhow::Result<()> {
         .map(|state| {
             let mut energized = HashSet::new();
             let _ = trace_ray(&input, state, &mut energized);
-            let mut energized_map = input.clone();
 
             let part1 = energized
                 .iter()
                 .map(|state| state.pos)
                 .unique()
-                .inspect(|pos| energized_map[pos.1 as usize][pos.0 as usize] = '#')
                 .count();
             part1
         }).max();
