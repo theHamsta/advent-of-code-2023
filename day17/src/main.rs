@@ -1,9 +1,9 @@
-use std::collections::{HashMap, HashSet, VecDeque};
+use std::collections::HashMap;
 
 use itertools::Itertools;
 
 #[allow(dead_code)]
-fn plot(input: &Vec<Vec<char>>) {
+fn plot(input: &[Vec<char>]) {
     for y in 0..input.len() {
         for x in 0..input[0].len() {
             print!("{}", input[y][x]);
@@ -31,7 +31,12 @@ struct Pos {
     prev: Key,
 }
 
-fn find_solution(input: &Vec<Vec<char>>, min_repetions: u32, max_repetitions: u32) -> Option<i64> {
+fn find_solution(
+    input: &[Vec<char>],
+    min_repetions: u32,
+    max_repetitions: u32,
+    plot_result: bool,
+) -> Option<i64> {
     let mut pq = priority_queue::PriorityQueue::new();
 
     pq.push(
@@ -112,35 +117,37 @@ fn find_solution(input: &Vec<Vec<char>>, min_repetions: u32, max_repetitions: u3
             (*pos == goal && reps.repetitions + 1 >= min_repetions).then_some(val)
         })
         .min_by_key(|val| val.heat_loss);
-    //if let Some(mut cur) = last {
-    //let mut prev: Option<&Pos> = None;
-    //let mut path = input.clone();
-    //loop {
-    //if let Some(prev) = prev {
-    //if prev.pos == cur.pos {
-    //break;
-    //}
-    //path[cur.pos.1 as usize][cur.pos.0 as usize] =
-    //match (prev.pos.0 - cur.pos.0, prev.pos.1 - cur.pos.1) {
-    //(1, 0) => '>',
-    //(-1, 0) => '<',
-    //(0, 1) => 'V',
-    //(0, -1) => '^',
-    //_ => unreachable!(),
-    //};
-    //}
+    if plot_result {
+        if let Some(mut cur) = last {
+            let mut prev: Option<&Pos> = None;
+            let mut path = input.to_vec();
+            loop {
+                if let Some(prev) = prev {
+                    if prev.pos == cur.pos {
+                        break;
+                    }
+                    path[cur.pos.1 as usize][cur.pos.0 as usize] =
+                        match (prev.pos.0 - cur.pos.0, prev.pos.1 - cur.pos.1) {
+                            (1, 0) => '>',
+                            (-1, 0) => '<',
+                            (0, 1) => 'V',
+                            (0, -1) => '^',
+                            _ => unreachable!(),
+                        };
+                }
 
-    //prev = Some(cur);
-    //cur = &reached[&cur.prev];
-    //}
-    //plot(&path);
-    //}
+                prev = Some(cur);
+                cur = &reached[&cur.prev];
+            }
+            plot(&path);
+        }
 
-    //let mut reached_field = input.clone();
-    //for pos in reached.values() {
-    //reached_field[pos.pos.1 as usize][pos.pos.0 as usize] = '#';
-    //}
-    //plot(&reached_field);
+        //let mut reached_field = input.to_vec();
+        //for pos in reached.values() {
+        //reached_field[pos.pos.1 as usize][pos.pos.0 as usize] = '#';
+        //}
+        //plot(&reached_field);
+    }
     last.map(|val| val.heat_loss)
 }
 
@@ -151,9 +158,10 @@ fn main() -> anyhow::Result<()> {
 
     let input = input.lines().map(|s| s.chars().collect_vec()).collect_vec();
 
-    let part1 = find_solution(&input, 0, 3);
+    let plot = false;
+    let part1 = find_solution(&input, 0, 3, plot);
     dbg!(&part1);
-    let part2 = find_solution(&input, 4, 10);
+    let part2 = find_solution(&input, 4, 10, plot);
     dbg!(&part2);
 
     Ok(())
