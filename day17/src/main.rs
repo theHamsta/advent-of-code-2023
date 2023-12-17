@@ -1,4 +1,7 @@
-use std::collections::HashMap;
+use std::{
+    cmp::Reverse,
+    collections::{BinaryHeap, HashMap},
+};
 
 use itertools::Itertools;
 
@@ -13,21 +16,24 @@ fn plot(input: &[Vec<char>]) {
     println!();
 }
 
-#[derive(Debug, Default, Hash, PartialEq, Eq, Clone, Copy)]
+type PointInt = i16;
+type Point2d = (PointInt, PointInt);
+
+#[derive(Debug, Default, Hash, PartialEq, Eq, Clone, Copy, PartialOrd, Ord)]
 struct Repetitions {
     repetitions: u32,
-    dir: (i64, i64),
+    dir: Point2d,
 }
 
-type Key = ((i64, i64), Repetitions);
+type Key = (Point2d, Repetitions);
 //type Key = ((i64, i64), VecDeque<(i64, i64)>);
 //type Key = (i64, i64);
 
-#[derive(Clone, Debug, PartialEq, Eq, Hash)]
+#[derive(Clone, Debug, PartialEq, Eq, Hash, PartialOrd, Ord)]
 struct Pos {
-    pos: (i64, i64),
-    repetitions: Repetitions,
     heat_loss: i64,
+    pos: Point2d,
+    repetitions: Repetitions,
     prev: Key,
 }
 
@@ -37,26 +43,23 @@ fn find_solution(
     max_repetitions: u32,
     plot_result: bool,
 ) -> Option<i64> {
-    let mut pq = priority_queue::PriorityQueue::new();
+    let mut pq = BinaryHeap::new();
 
-    pq.push(
-        Pos {
-            pos: (0, 0),
-            repetitions: Default::default(),
-            heat_loss: 0,
-            prev: Key::default(),
-        },
-        0i64,
-    );
+    pq.push(Reverse(Pos {
+        pos: (0, 0),
+        repetitions: Default::default(),
+        heat_loss: 0,
+        prev: Key::default(),
+    }));
 
     let mut reached = HashMap::<Key, Pos>::new();
-    let goal = (input[0].len() as i64 - 1, input.len() as i64 - 1);
+    let goal = (input[0].len() as PointInt - 1, input.len() as PointInt - 1);
 
-    while let Some((current, _)) = pq.pop() {
+    while let Some(Reverse(current)) = pq.pop() {
         let (x, y) = current.pos;
 
         let key = (current.pos, current.repetitions);
-        //let key = current.pos;
+
         match reached.entry(key) {
             std::collections::hash_map::Entry::Occupied(mut o) => {
                 if o.get().heat_loss > current.heat_loss {
@@ -70,6 +73,9 @@ fn find_solution(
                 v.insert(current.clone());
             }
         }
+        if current.pos == goal && current.repetitions.repetitions + 1 >= min_repetions {
+            break;
+        }
 
         for (dx, dy) in [(-1, 0), (1, 0), (0, -1), (0, 1)] {
             if (-dx, -dy) == current.repetitions.dir {
@@ -78,9 +84,9 @@ fn find_solution(
 
             let new_pos = (x + dx, y + dy);
             if new_pos.1 < 0
-                || new_pos.1 >= input.len() as i64
+                || new_pos.1 >= input.len() as PointInt
                 || new_pos.0 < 0
-                || new_pos.0 >= input[0].len() as i64
+                || new_pos.0 >= input[0].len() as PointInt
             {
                 continue;
             }
@@ -99,15 +105,12 @@ fn find_solution(
                 repetitions.repetitions = 0;
             }
             repetitions.dir = (dx, dy);
-            pq.push(
-                Pos {
-                    pos: new_pos,
-                    repetitions,
-                    heat_loss,
-                    prev: key,
-                },
-                -heat_loss,
-            );
+            pq.push(Reverse(Pos {
+                pos: new_pos,
+                repetitions,
+                heat_loss,
+                prev: key,
+            }));
         }
     }
 
