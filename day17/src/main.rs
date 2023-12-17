@@ -13,13 +13,20 @@ fn plot(input: &Vec<Vec<char>>) {
     println!();
 }
 
-type Key = ((i64, i64), VecDeque<(i64, i64)>);
+#[derive(Debug, Default, Hash, PartialEq, Eq, Clone, Copy)]
+struct Repetitions {
+    repetitions: u32,
+    dir: (i64, i64),
+}
+
+type Key = ((i64, i64), Repetitions);
+//type Key = ((i64, i64), VecDeque<(i64, i64)>);
 //type Key = (i64, i64);
 
 #[derive(Clone, Debug, PartialEq, Eq, Hash)]
 struct Pos {
     pos: (i64, i64),
-    last_three: VecDeque<(i64, i64)>,
+    repetitions: Repetitions,
     heat_loss: i64,
     prev: Key,
 }
@@ -27,6 +34,7 @@ struct Pos {
 fn main() -> anyhow::Result<()> {
     let input = include_str!("../input");
     //let input = include_str!("../example1");
+    //let input = include_str!("../example2");
 
     let input = input.lines().map(|s| s.chars().collect_vec()).collect_vec();
 
@@ -35,7 +43,7 @@ fn main() -> anyhow::Result<()> {
     pq.push(
         Pos {
             pos: (0, 0),
-            last_three: VecDeque::new(),
+            repetitions: Default::default(),
             heat_loss: 0,
             prev: Key::default(),
         },
@@ -55,7 +63,7 @@ fn main() -> anyhow::Result<()> {
             dbg!(&pq.len());
         }
 
-        let key = (current.pos, current.last_three.clone());
+        let key = (current.pos, current.repetitions.clone());
         //let key = current.pos;
         match reached.entry(key.clone()) {
             std::collections::hash_map::Entry::Occupied(mut o) => {
@@ -72,7 +80,7 @@ fn main() -> anyhow::Result<()> {
         }
 
         for (dx, dy) in [(-1, 0), (1, 0), (0, -1), (0, 1)] {
-            if Some((-dx, -dy)) == current.last_three.back().copied() {
+            if (-dx, -dy) == current.repetitions.dir {
                 continue;
             }
 
@@ -86,18 +94,38 @@ fn main() -> anyhow::Result<()> {
             }
             let value = input[(y + dy) as usize][(x + dx) as usize] as u32 - '0' as u32;
             let heat_loss = current.heat_loss + value as i64;
-            let mut last_three = current.last_three.clone();
-            if last_three.len() == 3 && last_three.iter().all(|&last| last == (dx, dy)) {
-                continue;
+            let mut repetitions = current.repetitions;
+            //dbg!(&(x, y));
+            //dbg!(&(dx, dy));
+            //dbg!(&repetitions.repetitions);
+            if repetitions.dir == (dx, dy) || repetitions.dir == (0, 0) {
+                repetitions.repetitions += 1;
+                if repetitions.repetitions + 1 > 10 {
+                    //println!("too much rep");
+                    continue;
+                }
+                //println!("Same dir ok");
+            } else {
+                if repetitions.repetitions + 1 < 4 {
+                    //println!("too few rep");
+                    continue;
+                }
+                //println!("Turning");
+                repetitions.repetitions = 0;
             }
-            last_three.push_back((dx, dy));
-            if last_three.len() > 3 {
-                last_three.pop_front();
-            }
+            repetitions.dir = (dx, dy);
+            //if last_three.dir ==
+            //if last_three.len() == 10 && last_three.iter().all(|&last| last == (dx, dy)) {
+            //continue;
+            //}
+            //last_three.push_back((dx, dy));
+            //if last_three.len() > 10 {
+            //last_three.pop_front();
+            //}
             pq.push(
                 Pos {
                     pos: new_pos,
-                    last_three: last_three.clone(),
+                    repetitions,
                     heat_loss,
                     prev: key.clone(),
                 },
@@ -107,39 +135,40 @@ fn main() -> anyhow::Result<()> {
             //break;
             //}
         }
+        //1188
     }
 
     let last = reached
         .iter()
-        .filter_map(|((pos, _), val)| (*pos == goal).then_some(val))
-        .min_by_key(|val| val.heat_loss)
-        .unwrap();
+        .filter_map(|((pos, reps), val)| (*pos == goal && reps.repetitions + 1 >= 4).then_some(val))
+        .min_by_key(|val| val.heat_loss);
     //let last = &reached[&goal];
-    let part1 = last.heat_loss;
+    let part1 = last.map(|val| val.heat_loss);
     dbg!(&part1);
 
-    let mut cur = last;
-    let mut prev: Option<&Pos> = None;
-    let mut path = input.clone();
-    loop {
-        if let Some(prev) = prev {
-            if prev.pos == cur.pos {
-                break;
-            }
-            path[cur.pos.1 as usize][cur.pos.0 as usize] =
-                match (prev.pos.0 - cur.pos.0, prev.pos.1 - cur.pos.1) {
-                    (1, 0) => '>',
-                    (-1, 0) => '<',
-                    (0, 1) => 'V',
-                    (0, -1) => '^',
-                    _ => unreachable!(),
-                };
-        }
+    //if let Some(mut cur) = last {
+        //let mut prev: Option<&Pos> = None;
+        //let mut path = input.clone();
+        //loop {
+            //if let Some(prev) = prev {
+                //if prev.pos == cur.pos {
+                    //break;
+                //}
+                //path[cur.pos.1 as usize][cur.pos.0 as usize] =
+                    //match (prev.pos.0 - cur.pos.0, prev.pos.1 - cur.pos.1) {
+                        //(1, 0) => '>',
+                        //(-1, 0) => '<',
+                        //(0, 1) => 'V',
+                        //(0, -1) => '^',
+                        //_ => unreachable!(),
+                    //};
+            //}
 
-        prev = Some(cur);
-        cur = &reached[&cur.prev];
-    }
-    plot(&path);
+            //prev = Some(cur);
+            //cur = &reached[&cur.prev];
+        //}
+        //plot(&path);
+    //}
     //1048
 
     //let mut reached_field = input.clone();
