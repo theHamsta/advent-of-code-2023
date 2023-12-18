@@ -7,10 +7,7 @@ edition = "2021"
 
 [dependencies]
 anyhow = "1.0.75"
-geo = "0.27.0"
-geo-types = "0.7.12"
 itertools = "0.12.0"
-line_intersection = "0.4.0"
 ndarray = "0.15.6"
 num = "0.4.1"
 rayon = "1.8.0"
