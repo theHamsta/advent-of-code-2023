@@ -1,21 +1,9 @@
-use std::collections::{HashMap, HashSet};
+use std::{
+    collections::{HashMap, HashSet},
+    ops::RangeInclusive,
+};
 
-use geo::{Area, Intersects, Line};
-use geo_types::{LineString, Polygon};
 use itertools::{Itertools, MinMaxResult};
-use line_intersection::LineInterval;
-use rayon::iter::IntoParallelIterator;
-
-#[allow(dead_code)]
-fn plot(input: &Vec<Vec<char>>) {
-    for y in 0..input.len() {
-        for x in 0..input[0].len() {
-            print!("{}", input[y][x]);
-        }
-        println!();
-    }
-    println!();
-}
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
 struct Trench {
@@ -82,6 +70,100 @@ fn inside_area(field: &HashSet<Point2d>) -> u64 {
     sum
 }
 
+#[derive(Debug)]
+struct Quad {
+    x_range: RangeInclusive<i64>,
+    y_range: RangeInclusive<i64>,
+}
+
+impl Quad {
+    fn can_go_right(&self, lines: &[(Point2d, Point2d)]) -> bool {
+        !lines.iter().copied().any(|(start, end)| {
+            let range = start.1.min(end.1)..=start.1.max(end.1);
+            *self.x_range.end() == start.0
+                && *self.x_range.end() == end.0
+                && range.contains(self.y_range.start())
+                && range.contains(self.y_range.end())
+        })
+    }
+
+    fn can_go_left(&self, lines: &[(Point2d, Point2d)]) -> bool {
+        !lines.iter().copied().any(|(start, end)| {
+            let range = start.1.min(end.1)..=start.1.max(end.1);
+            *self.x_range.start() == start.0
+                && *self.x_range.start() == end.0
+                && range.contains(self.y_range.start())
+                && range.contains(self.y_range.end())
+        })
+    }
+
+    fn can_go_up(&self, lines: &[(Point2d, Point2d)]) -> bool {
+        !lines.iter().copied().any(|(start, end)| {
+            //println!("({},{}) -> ({},{})", start.0, start.1, end.0, end.1);
+            let range = start.0.min(end.0)..=start.0.max(end.0);
+            *self.y_range.start() == start.1
+                && *self.y_range.start() == end.1
+                && range.contains(self.x_range.start())
+                && range.contains(self.x_range.end())
+        })
+    }
+
+    fn can_go_down(&self, lines: &[(Point2d, Point2d)]) -> bool {
+        !lines.iter().copied().any(|(start, end)| {
+            let range = start.0.min(end.0)..=start.0.max(end.0);
+            *self.y_range.end() == start.1
+                && *self.y_range.end() == end.1
+                && range.contains(self.x_range.start())
+                && range.contains(self.x_range.end())
+        })
+    }
+
+    fn distinct_ranges(&self) -> Vec<(RangeInclusive<i64>, RangeInclusive<i64>)> {
+        let Self { x_range, y_range } = self;
+        vec![
+            // corners
+            (
+                (*x_range.start())..=(*x_range.start()),
+                (*y_range.start())..=(*y_range.start()),
+            ),
+            (
+                (*x_range.end())..=(*x_range.end()),
+                (*y_range.start())..=(*y_range.start()),
+            ),
+            (
+                (*x_range.start())..=(*x_range.start()),
+                (*y_range.end())..=(*y_range.end()),
+            ),
+            (
+                (*x_range.end())..=(*x_range.end()),
+                (*y_range.end())..=(*y_range.end()),
+            ),
+            // borders
+            (
+                (*x_range.start() + 1)..=(*x_range.end() - 1),
+                (*y_range.start())..=(*y_range.start()),
+            ),
+            (
+                (*x_range.start() + 1)..=(*x_range.end() - 1),
+                (*y_range.end())..=(*y_range.end()),
+            ),
+            (
+                (*x_range.start())..=(*x_range.start()),
+                (*y_range.start() + 1)..=(*y_range.end() - 1),
+            ),
+            (
+                (*x_range.end())..=(*x_range.end()),
+                (*y_range.start() + 1)..=(*y_range.end() - 1),
+            ),
+            // middle
+            (
+                (*x_range.start() + 1)..=(*x_range.end() - 1),
+                (*y_range.start() + 1)..=(*y_range.end() - 1),
+            ),
+        ]
+    }
+}
+
 fn inside_area_lines(lines: &[(Point2d, Point2d)]) -> i64 {
     let x_coords = lines
         .iter()
@@ -97,84 +179,78 @@ fn inside_area_lines(lines: &[(Point2d, Point2d)]) -> i64 {
         .unique()
         .sorted()
         .collect_vec();
-    dbg!(&x_coords);
+    let quads = y_coords
+        .iter()
+        .copied()
+        .tuple_windows()
+        .cartesian_product(x_coords.iter().copied().tuple_windows())
+        .map(|((yl, yh), (xl, xh))| Quad {
+            x_range: xl..=xh,
+            y_range: yl..=yh,
+        })
+        .collect_vec();
 
-    let start: Point2d = (-1, -1);
+    //for l in lines.iter() {
+    //println!("({},{}) -> ({},{})", l.0 .0, l.0 .1, l.1 .0, l.1 .1);
+    //}
+    //dbg!(&x_coords);
+    //dbg!(&y_coords);
+
+    let width = x_coords.len() as i64 - 1;
+    let height = y_coords.len() as i64 - 1;
+    assert_eq!(quads.len() as i64, width * height);
     let mut visited = HashMap::new();
 
-    let mut stack = vec![(start, start)];
+    // Take any tile that is guaranteed inside
+    let start = lines[0].0;
+    let start_tile = quads
+        .iter()
+        .position(|q| *q.x_range.start() == start.0 && *q.y_range.start() == start.1)
+        .expect("did not prepare for puzzle input wher line[0].start is x_max or y_max");
 
-    while let Some(((x, y), (last_x, last_y))) = stack.pop() {
-        if x < -1 || x > x_coords.len() as i64 || y < -1 || y > y_coords.len() as i64 {
+    let mut stack = vec![(
+        (start_tile as i64 % width, start_tile as i64 / width),
+        (0, 0),
+    )];
+
+    // Now let's traverse all remaining quads without intersecting a line (which would lead us into
+    // outside)
+    while let Some(((x, y), dir)) = stack.pop() {
+        if x < 0 || x >= width || y < 0 || y >= height {
             continue;
         }
         if visited.contains_key(&(x, y)) {
             continue;
+        };
+        visited.insert((x, y), dir);
+        let quad = &quads[(y * width + x) as usize];
+
+        if quad.can_go_right(lines) {
+            stack.push(((x + 1, y), (1, 0)));
         }
-        if lines.iter().any(|(start, end)| {
-            let line1 = geo::geometry::Line {
-                start: (*start).into(),
-                end: (*end).into(),
-            };
-            let line2 = geo::geometry::Line {
-                start: (
-                    if last_x == -1 {
-                        x_coords[0] - 1
-                    } else if last_x == x_coords.len() as i64 {
-                        *x_coords.last().unwrap() + 1
-                    } else {
-                        x_coords[last_x as usize] + 1
-                    },
-                    if last_y == -1 {
-                        y_coords[0] - 1
-                    } else if last_y == y_coords.len() as i64 {
-                        *y_coords.last().unwrap() + 1
-                    } else {
-                        y_coords[last_y as usize] + 1
-                    },
-                )
-                    .into(),
-                end: (
-                    if x == -1 {
-                        x_coords[0] - 1
-                    } else if x == x_coords.len() as i64 {
-                        *x_coords.last().unwrap() + 1
-                    } else {
-                        x_coords[x as usize] + 1
-                    },
-                    if y == -1 {
-                        y_coords[0] - 1
-                    } else if y == y_coords.len() as i64 {
-                        *y_coords.last().unwrap() + 1
-                    } else {
-                        y_coords[y as usize] + 1
-                    },
-                )
-                    .into(),
-            };
-            line1.intersects(&line2)
-        }) {
-            continue;
+        if quad.can_go_left(lines) {
+            stack.push(((x - 1, y), (-1, 0)));
         }
-        let area =
-            if x >= 0 && x + 1 < x_coords.len() as i64 && y >= 0 && y + 1 < y_coords.len() as i64 {
-                let dx = x_coords[x as usize + 1] - x_coords[x as usize];
-                let dy = y_coords[y as usize + 1] - y_coords[y as usize];
-                dx * dy
-            } else {
-                0
-            };
-        visited.insert((x, y), area);
-        stack.push(((x + 1, y), (x, y)));
-        stack.push(((x - 1, y), (x, y)));
-        stack.push(((x, y + 1), (x, y)));
-        stack.push(((x, y - 1), (x, y)));
-        //for y in (-1)..=(y_coords.len() as i64) {
-        //for x in (-1)..=(x_coords.len() as i64) {
+        if quad.can_go_down(lines) {
+            stack.push(((x, y + 1), (0, 1)));
+        }
+        if quad.can_go_up(lines) {
+            stack.push(((x, y - 1), (0, -1)));
+        }
+
+        //for y in 0..height {
+        //for x in 0..width {
         //if visited.contains_key(&(x, y)) {
-        //print!(".");
+        //match visited[&(x, y)] {
+        //(0, 0) => print!("#"),
+        //(0, 1) => print!("v"),
+        //(1, 0) => print!(">"),
+        //(0, -1) => print!("^"),
+        //(-1, 0) => print!("<"),
+        //_ => unreachable!(),
+        //}
         //} else {
-        //print!("#");
+        //print!(".");
         //}
         //}
         //println!();
@@ -182,27 +258,24 @@ fn inside_area_lines(lines: &[(Point2d, Point2d)]) -> i64 {
         //println!();
     }
 
-    for y in (-1)..=(y_coords.len() as i64) {
-        for x in (-1)..=(x_coords.len() as i64) {
-            if visited.contains_key(&(x, y)) {
-                print!(".");
-            } else {
-                print!("#");
-            }
-        }
-        println!();
-    }
+    let mut field = vec![0; 7 * 10usize];
 
-    let outside_area: i64 = visited.values().copied().sum();
-    let total =
-        (*x_coords.last().unwrap() - x_coords[0]) * (*y_coords.last().unwrap() - y_coords[0]);
-
-    (total - outside_area) / 4
+    let ret = visited
+        .keys()
+        .map(|(x, y)| &quads[(y * width + x) as usize])
+        .flat_map(|q| q.distinct_ranges())
+        .unique()
+        .map(|(rx, ry)| {
+            (rx.end() + 1 - rx.start()).clamp(0, i64::max_value())
+                * (ry.end() + 1 - ry.start()).clamp(0, i64::max_value())
+        })
+        .sum();
+    ret
 }
 
 fn main() -> anyhow::Result<()> {
     let input = include_str!("../input");
-    let input = include_str!("../example1");
+    //let input = include_str!("../example1");
 
     let regex = regex::Regex::new(r"(\w) (\d+) [(]#(\w+)[)]").unwrap();
     let input = input
@@ -237,6 +310,33 @@ fn main() -> anyhow::Result<()> {
     let mut lines = Vec::new();
     let mut cur = State::default();
     for t in input.iter() {
+        cur.dir = match t.color & 0xF {
+            0 => (1, 0),
+            1 => (0, 1),
+            2 => (-1, 0),
+            3 => (0, -1),
+            _ => unreachable!(),
+        };
+        let start = cur.pos;
+        cur.pos = (
+            cur.pos.0 + cur.dir.0 * (t.color >> 4) as i64,
+            cur.pos.1 + cur.dir.1 * (t.color >> 4) as i64,
+        );
+        let end = cur.pos;
+        lines.push((start, end));
+    }
+    //   952408144115
+    //303815444000044
+    let part1 = inside_area(&field);
+    dbg!(&part1);
+
+    let part2 = inside_area_lines(&lines);
+    dbg!(&part2);
+
+    // This is when you don't read the instructions
+    let mut lines = Vec::new();
+    let mut cur = State::default();
+    for t in input.iter() {
         cur.dir = match t.dir {
             'R' => (1, 0),
             'D' => (0, 1),
@@ -246,18 +346,14 @@ fn main() -> anyhow::Result<()> {
         };
         let start = cur.pos;
         cur.pos = (
-            cur.pos.0 + cur.dir.0 * (t.distance + 1) as i64,
-            cur.pos.1 + cur.dir.1 * (t.distance + 1) as i64,
+            cur.pos.0 + cur.dir.0 * (t.color) as i64,
+            cur.pos.1 + cur.dir.1 * (t.color) as i64,
         );
         let end = cur.pos;
         lines.push((start, end));
     }
-
-    let part1 = inside_area(&field);
-    dbg!(&part1);
-
-    let part2 = inside_area_lines(&lines);
-    dbg!(&part2);
+    let part3 = inside_area_lines(&lines);
+    dbg!(&part3);
 
     //let mut inside_field = HashMap::new();
 
