@@ -21,7 +21,7 @@ struct State {
 
 type Point2d = (i64, i64);
 
-fn inside_area(field: &HashSet<Point2d>) -> u64 {
+fn inside_area_naive(field: &HashSet<Point2d>) -> u64 {
     let MinMaxResult::MinMax(min_x, max_x): itertools::MinMaxResult<i64> =
         field.iter().copied().map(|(x, _)| x).minmax()
     else {
@@ -258,8 +258,6 @@ fn inside_area_lines(lines: &[(Point2d, Point2d)]) -> i64 {
         //println!();
     }
 
-    let mut field = vec![0; 7 * 10usize];
-
     let ret = visited
         .keys()
         .map(|(x, y)| &quads[(y * width + x) as usize])
@@ -327,7 +325,7 @@ fn main() -> anyhow::Result<()> {
     }
     //   952408144115
     //303815444000044
-    let part1 = inside_area(&field);
+    let part1 = inside_area_naive(&field);
     dbg!(&part1);
 
     let part2 = inside_area_lines(&lines);
@@ -354,62 +352,6 @@ fn main() -> anyhow::Result<()> {
     }
     let part3 = inside_area_lines(&lines);
     dbg!(&part3);
-
-    //let mut inside_field = HashMap::new();
-
-    //let mut area = 0u64;
-    //for y in min_y..=(max_y + 1) {
-    //let mut inside = false;
-    //cur.last_char = ' ';
-    //for x in min_x..=(max_x + 1) {
-    //if field.contains_key(&(x, y)) {
-    //*inside_field.entry((x, y)).or_insert(0) += 1;
-    //cur.last_char = '#';
-    //print!("#");
-    //} else {
-    //if cur.last_char == '#' {
-    //inside = !inside;
-    //}
-    //if inside {
-    //area += 1;
-    //*inside_field.entry((x, y)).or_insert(0) += 1;
-    //print!(".");
-    //} else {
-    //print!(" ");
-    //}
-    //cur.last_char = ' ';
-    //}
-    //}
-    //println!();
-    //}
-    //for x in min_x..=(max_x + 1) {
-    //let mut inside = false;
-    //cur.last_char = ' ';
-    //for y in min_y..=(max_y + 1) {
-    //if field.contains_key(&(x, y)) {
-    //*inside_field.entry((x, y)).or_insert(0) += 1;
-    //cur.last_char = '#';
-    //print!("#");
-    //} else {
-    //if cur.last_char == '#' {
-    //inside = !inside;
-    //}
-    //if inside {
-    //area += 1;
-    //*inside_field.entry((x, y)).or_insert(0) += 1;
-    //print!(".");
-    //} else {
-    //print!(" ");
-    //}
-    //cur.last_char = ' ';
-    //}
-    //}
-    //println!();
-    //}
-    //let part1 = inside_field.values().filter(|&&v| v == 2).count();
-    //dbg!(&part1);
-    //49246
-    //48326
 
     Ok(())
 }
