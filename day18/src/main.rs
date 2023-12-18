@@ -206,7 +206,7 @@ fn inside_area_lines(lines: &[(Point2d, Point2d)]) -> i64 {
     let start_tile = quads
         .iter()
         .position(|q| *q.x_range.start() == start.0 && *q.y_range.start() == start.1)
-        .expect("did not prepare for puzzle input wher line[0].start is x_max or y_max");
+        .expect("did not prepare for puzzle input where line[0].start is x_max or y_max");
 
     let mut stack = vec![(
         (start_tile as i64 % width, start_tile as i64 / width),
