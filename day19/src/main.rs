@@ -1,4 +1,4 @@
-use std::collections::{HashMap, HashSet};
+use std::collections::HashMap;
 
 use itertools::Itertools;
 
@@ -6,7 +6,7 @@ use itertools::Itertools;
 struct Check {
     what: String,
     op: char,
-    number: i64,
+    number: i32,
     dst: String,
 }
 
@@ -20,7 +20,7 @@ fn is_rating_collection_accepted(
     ratings: &HashMap<String, i64>,
     rules: &HashMap<String, WhatToDo>,
 ) -> bool {
-    let mut cur = "in".to_string();
+    let mut cur = "in";
     'outer: loop {
         if cur == "R" {
             return false;
@@ -28,7 +28,7 @@ fn is_rating_collection_accepted(
         if cur == "A" {
             return true;
         }
-        let rule = &rules[&cur];
+        let rule = &rules[cur];
 
         for c in &rule.checks {
             match c {
@@ -38,8 +38,8 @@ fn is_rating_collection_accepted(
                     number,
                     dst,
                 } => {
-                    if ratings[what] < *number {
-                        cur = dst.to_string();
+                    if ratings[what] < (*number).into() {
+                        cur = dst.as_str();
                         continue 'outer;
                     }
                 }
@@ -49,16 +49,86 @@ fn is_rating_collection_accepted(
                     number,
                     dst,
                 } => {
-                    if ratings[what] > *number {
-                        cur = dst.to_string();
+                    if ratings[what] > (*number).into() {
+                        cur = dst.as_str();
                         continue 'outer;
                     }
                 }
                 _ => unreachable!(),
             }
         }
-        cur = rule.alternative.to_string();
+        cur = rule.alternative.as_str();
     }
+}
+
+fn count_rating_collection_accepted_possibilities(
+    ratings: &mut HashMap<String, (i32, i32)>,
+    rules: &HashMap<String, WhatToDo>,
+    cur: &str,
+) -> i64 {
+    if cur == "R" {
+        return 0;
+    }
+    if cur == "A" {
+        return ratings
+            .values()
+            .copied()
+            .map(|(low, high)| high as i64 + 1 - low as i64)
+            .product();
+    }
+    let rule = &rules[cur];
+    let mut sum_accepted = 0;
+
+    for c in &rule.checks {
+        match c {
+            Check {
+                what,
+                op: '<',
+                number,
+                dst,
+            } => {
+                let (low, high) = ratings[what];
+                if low < *number {
+                    let mut clone = ratings.clone();
+                    *clone.get_mut(what).unwrap() = (low, (*number - 1).min(high));
+                    sum_accepted += count_rating_collection_accepted_possibilities(
+                        &mut clone,
+                        rules,
+                        dst.as_str(),
+                    );
+                    if high < *number {
+                        return sum_accepted;
+                    }
+                    *ratings.get_mut(what).unwrap() = (*number, high);
+                }
+            }
+            Check {
+                what,
+                op: '>',
+                number,
+                dst,
+            } => {
+                let (low, high) = ratings[what];
+                if high > *number {
+                    let mut clone = ratings.clone();
+                    *clone.get_mut(what).unwrap() = (low.max(*number + 1), high);
+                    sum_accepted += count_rating_collection_accepted_possibilities(
+                        &mut clone,
+                        rules,
+                        dst.as_str(),
+                    );
+                    if low > *number {
+                        return sum_accepted;
+                    }
+                    *ratings.get_mut(what).unwrap() = (low, *number);
+                }
+            }
+            _ => unreachable!(),
+        }
+    }
+    sum_accepted +=
+        count_rating_collection_accepted_possibilities(ratings, rules, rule.alternative.as_str());
+    sum_accepted
 }
 
 fn main() -> anyhow::Result<()> {
@@ -108,6 +178,15 @@ fn main() -> anyhow::Result<()> {
         .flat_map(|r| is_rating_collection_accepted(r, &rules).then(|| r.values().sum::<i64>()))
         .sum();
     dbg!(&part1);
+
+    let mut rating = HashMap::new();
+    rating.insert("x".to_string(), (1, 4000));
+    rating.insert("m".to_string(), (1, 4000));
+    rating.insert("a".to_string(), (1, 4000));
+    rating.insert("s".to_string(), (1, 4000));
+    let part2 = count_rating_collection_accepted_possibilities(&mut rating, &rules, "in");
+
+    dbg!(&part2);
 
     Ok(())
 }
