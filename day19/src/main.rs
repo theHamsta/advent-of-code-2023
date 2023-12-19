@@ -4,9 +4,9 @@ use itertools::Itertools;
 
 #[derive(Clone, Debug, PartialEq, Eq, Hash, Default)]
 struct Check {
-    cond_what: String,
-    cond_op: char,
-    cond_number: i64,
+    what: String,
+    op: char,
+    number: i64,
     dst: String,
 }
 
@@ -20,9 +20,45 @@ fn is_rating_collection_accepted(
     ratings: &HashMap<String, i64>,
     rules: &HashMap<String, WhatToDo>,
 ) -> bool {
+    let mut cur = "in".to_string();
+    'outer: loop {
+        if cur == "R" {
+            return false;
+        }
+        if cur == "A" {
+            return true;
+        }
+        let rule = &rules[&cur];
 
-
-    true
+        for c in &rule.checks {
+            match c {
+                Check {
+                    what,
+                    op: '<',
+                    number,
+                    dst,
+                } => {
+                    if ratings[what] < *number {
+                        cur = dst.to_string();
+                        continue 'outer;
+                    }
+                }
+                Check {
+                    what,
+                    op: '>',
+                    number,
+                    dst,
+                } => {
+                    if ratings[what] > *number {
+                        cur = dst.to_string();
+                        continue 'outer;
+                    }
+                }
+                _ => unreachable!(),
+            }
+        }
+        cur = rule.alternative.to_string();
+    }
 }
 
 fn main() -> anyhow::Result<()> {
@@ -42,9 +78,9 @@ fn main() -> anyhow::Result<()> {
             let checks = check_regex
                 .captures_iter(&cap[2])
                 .map(|c| Check {
-                    cond_what: c[1].to_string(),
-                    cond_op: c[2].chars().next().unwrap(),
-                    cond_number: c[3].parse().unwrap(),
+                    what: c[1].to_string(),
+                    op: c[2].chars().next().unwrap(),
+                    number: c[3].parse().unwrap(),
                     dst: c[4].to_string(),
                 })
                 .collect_vec();
