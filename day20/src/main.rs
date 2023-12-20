@@ -1,3 +1,4 @@
+use std::collections::VecDeque;
 use std::io::Write;
 use std::{
     collections::{BTreeMap, HashMap, HashSet},
@@ -100,6 +101,7 @@ struct Cycle {
     offset: u64,
     length: u64,
     when_high: Vec<u64>,
+    all_push: Vec<(u64, Pulse, i32)>,
 }
 
 fn get_high_cycle(
@@ -110,27 +112,41 @@ fn get_high_cycle(
     let mut already_seen = HashMap::new();
     let mut connections = connections.clone();
     let mut when_high = Vec::new();
+    let mut all_push = Vec::new();
     let mut offset = None;
     let mut length = None;
 
     for i in 1.. {
-        let mut stack = vec![("broadcaster".to_owned(), start.to_string(), Pulse::Low)];
-        while let Some((from, to, received)) = stack.pop() {
-            if received == Pulse::High && to == who_received_high && when_high.last() != Some(&i) {
-                when_high.push(i);
-            }
+        let mut stack = VecDeque::from(vec![(
+            "broadcaster".to_owned(),
+            start.to_string(),
+            Pulse::Low,
+            1,
+        )]);
+        while let Some((from, to, received, depth)) = stack.pop_front() {
             let cur = connections.get_mut(&to);
             let Some(cur) = cur else { continue };
             let sent = cur.send(&from, received);
+            if received == Pulse::High && to == who_received_high {
+                when_high.push(i);
+            }
+            if to == who_received_high {
+                all_push.push((i, received, depth));
+            }
             let Some(sent) = sent else { continue };
             for d in cur.dst.iter() {
-                stack.push((to.clone(), d.to_string(), sent));
+                stack.push_back((to.clone(), d.to_string(), sent, depth + 1));
             }
         }
         match already_seen.entry(connections.clone()) {
             std::collections::hash_map::Entry::Occupied(o) => {
                 length = Some(i - o.get());
                 offset = Some(i - length.unwrap());
+                all_push = all_push
+                    .iter()
+                    .copied()
+                    .filter(|(i, _, _)| *i == when_high[0])
+                    .collect();
                 when_high.iter_mut().for_each(|e| *e %= length.unwrap());
                 break;
             }
@@ -143,6 +159,7 @@ fn get_high_cycle(
         offset: offset.unwrap(),
         length: length.unwrap(),
         when_high,
+        all_push,
     }
 }
 
@@ -160,7 +177,7 @@ fn pairwise_chinese(mut a: i128, n: i128, mut b: i128, m: i128) -> (i128, i128) 
     assert_eq!(d, y * n + z * m);
 
     let (mut x, modulo) = (a - y * n * (a - b) / d, (n * m) / d);
-    while x <= 0 {
+    while x < 0 {
         x += modulo;
         x %= modulo;
     }
@@ -218,12 +235,8 @@ fn main() -> anyhow::Result<()> {
 
     let part1 = calc_round(&mut connections.clone(), 1000, false);
     dbg!(part1);
-    //let part2 = calc_round(&mut connections.clone(), u64::max_value(), true);
-    //dbg!(part2);
-    //let connected_components = get_connected_components(&connections, &connections["broadcaster"].dst.clone(), "vr");
-    //dbg!(&connected_components);
 
-    let mut cycles = connections["broadcaster"]
+    let cycles = connections["broadcaster"]
         .dst
         .iter()
         .map(|start| get_high_cycle(&connections, start, "vr"))
@@ -236,6 +249,14 @@ fn main() -> anyhow::Result<()> {
         )
     }
 
+    let lcm = cycles.iter().map(|c| c.length).reduce(|a, b| a.lcm(&b));
+    dbg!(&lcm);
+    let prod = cycles.iter().map(|c| c.length).product::<u64>();
+    dbg!(&prod);
+
+    // needed when doing depth-first for signal processing :face_palm:
+    // Numbers get uglier when iterations start at 0. Then, i128 is needed and a +1 for the final
+    // result
     let to_chinsese = cycles
         .iter()
         .map(|c| (c.when_high[0] as i128, c.length as i128));
@@ -248,67 +269,15 @@ fn main() -> anyhow::Result<()> {
     }
     part2.0 %= part2.1;
 
-    //cycles
-    //.iter_mut()
-    //.for_each(|c| c.offset = (c.offset + c.when_high[0] + c.length) % c.length);
+    cycles.iter().for_each(|c| {
+        assert_eq!(
+            part2.0 % c.length as i128,
+            c.when_high[0] as i128 % c.length as i128
+        )
+    });
 
-    //let m = cycles.iter().map(|c| c.length as i64).product::<i64>(); //.reduce(lcm).unwrap();
-    //let e = cycles
-    //.iter()
-    //.map(|c| c.when_high[0] as i64)
-    //.map(|o| {
-    //let ExtendedGcd {
-    //gcd: _, x: _, y, ..
-    //} = o.extended_gcd(&(m / o));
-    //y * (m / o)
-    //})
-    //.collect_vec();
-    //dbg!(&e);
-    //let part2 = (cycles
-    //.iter()
-    //.zip(e.iter())
-    //.map(|(c, e)| c.when_high[0] as i64 * e)
-    //.sum::<i64>())
-    //% m
-    //+ m;
-
-    //dbg!(&part2);
-
-    cycles
-        .iter()
-        .for_each(|c| assert_eq!(part2.0 % c.length as i128, c.when_high[0] as i128));
-    
-    //let part2 = part2.0 + 1;
-    let part2 = part2.0;// + 1;
+    let part2 = part2.0; // + 1;
     dbg!(&part2);
 
     Ok(())
-}
-
-fn get_connected_components(
-    connections: &BTreeMap<String, Connection>,
-    start_nodes: &[String],
-    until: &str,
-) -> Vec<HashSet<String>> {
-    let mut rtn = Vec::new();
-    for start in start_nodes {
-        let mut stack = vec![start];
-        let mut visited = HashSet::new();
-        while let Some(cur_name) = stack.pop() {
-            if !visited.insert(cur_name.clone()) {
-                continue;
-            }
-            if cur_name == until {
-                continue;
-            }
-            let cur = &connections[cur_name];
-            for d in &cur.dst {
-                stack.push(d);
-            }
-        }
-
-        rtn.push(visited);
-    }
-
-    rtn
 }
