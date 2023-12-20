@@ -67,7 +67,6 @@ name = "day20"
 version = "0.1.0"
 dependencies = [
  "anyhow",
- "g2poly",
  "itertools",
  "ndarray",
  "num",
@@ -80,12 +79,6 @@ name = "either"
 version = "1.9.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "a26ae43d7bcc3b814de94796a5e736d4029efb0ee900c12e2d54c993ad1a1e07"
-
-[[package]]
-name = "g2poly"
-version = "1.0.1"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "af6a86e750338603ea2c14b1c0bfe58cd61f87ca67a0021d9334996024608e12"
 
 [[package]]
 name = "itertools"

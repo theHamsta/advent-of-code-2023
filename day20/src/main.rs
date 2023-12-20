@@ -1,12 +1,12 @@
 use std::collections::VecDeque;
 use std::io::Write;
 use std::{
-    collections::{BTreeMap, HashMap, HashSet},
+    collections::{BTreeMap, HashMap},
     fs::File,
 };
 
 use itertools::Itertools;
-use num::integer::{lcm, ExtendedGcd};
+use num::integer::ExtendedGcd;
 use num::Integer;
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
