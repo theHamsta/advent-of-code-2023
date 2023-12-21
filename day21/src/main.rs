@@ -1,4 +1,4 @@
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 
 use itertools::Itertools;
 
@@ -8,35 +8,37 @@ fn count_steps(
     input: &Vec<Vec<char>>,
     (x, y): Point2d,
     steps: i64,
-    cache: &mut HashMap<(Point2d, i64), u64>,
-) -> u64 {
+    cache: &mut HashMap<(Point2d, i64), HashSet<Point2d>>,
+) -> HashSet<Point2d> {
     if x < 0
         || x >= input[0].len() as i16
         || y < 0
         || y >= input.len() as i16
         || input[y as usize][x as usize] == '#'
     {
-        return 0;
+        return HashSet::new();
     }
     if steps == 0 {
-        dbg!(&(x, y));
-        return 1;
+        let mut rtn = HashSet::new();
+        rtn.insert((x, y));
+
+        return rtn;
     }
     if let Some(res) = cache.get(&((x, y), steps)) {
-        return *res;
+        return res.clone();
     }
-    let mut sum = 0u64;
+    let mut points = HashSet::new();
     for (dx, dy) in [(1, 0), (-1, 0), (0, 1), (0, -1)] {
-        sum += count_steps(input, (x + dx, y + dy), steps - 1, cache);
+        /*sum +=*/
+        points.extend(count_steps(input, (x + dx, y + dy), steps - 1, cache));
     }
-    cache.insert(((x, y), steps), sum);
-    sum
+    cache.insert(((x, y), steps), points.clone());
+    points
 }
 
 fn main() -> anyhow::Result<()> {
     let input = include_str!("../input");
-    let input = include_str!("../example1");
-    //
+    //let input = include_str!("../example1");
 
     let input = input
         .lines()
@@ -56,7 +58,8 @@ fn main() -> anyhow::Result<()> {
     let start = start.unwrap();
 
     let mut cache = HashMap::new();
-    let part1 = count_steps(&input, start, 2, &mut cache);
+    let points = count_steps(&input, start, 64, &mut cache);
+    let part1 = points.len();
     dbg!(&part1);
 
     Ok(())
