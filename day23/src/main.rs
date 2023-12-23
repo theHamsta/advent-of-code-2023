@@ -30,9 +30,10 @@ fn find_longest_path_bitvec(input: &[Vec<char>], start: Point2d, part2: bool) ->
             }
         }
 
-        prev.set((y * width + x) as usize, true);
-
         if !part2 {
+            if prev.get_unchecked((y * width + x) as usize) {
+                continue;
+            }
             match cur {
                 '>' => {
                     if input[y as usize][x as usize + 1] != '#' {
@@ -62,6 +63,9 @@ fn find_longest_path_bitvec(input: &[Vec<char>], start: Point2d, part2: bool) ->
                 a => panic!("Didn't expect to see {a}"),
             }
         }
+
+        prev.set((y * width + x) as usize, true);
+
         for (dx, dy) in [(1, 0), (-1, 0), (0, 1), (0, -1)] {
             let (nx, ny) = (x + dx, y + dy);
             if nx >= 0
