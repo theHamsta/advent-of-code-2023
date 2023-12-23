@@ -1,6 +1,4 @@
 use bitvec_simd::BitVec;
-use petgraph::prelude::*;
-use petgraph::Graph;
 
 use itertools::Itertools;
 
@@ -16,7 +14,6 @@ fn find_longest_path_bitvec(input: &[Vec<char>], start: Point2d, part2: bool) ->
 
     let mut max_goal = 0u64;
 
-
     while let Some((steps, x, y, mut prev)) = pq.pop() {
         if x < 0 || x >= input[0].len() as i16 || y < 0 || y >= input.len() as i16 {
             continue;
@@ -26,12 +23,11 @@ fn find_longest_path_bitvec(input: &[Vec<char>], start: Point2d, part2: bool) ->
             continue;
         }
         if y == input.len() as i16 - 1 {
-            //goal_paths.push(visited.clone());
+            let old = max_goal;
             max_goal = max_goal.max(steps);
-            dbg!(&max_goal);
-        }
-        if prev.get_unchecked((y * width + x) as usize) {
-            continue;
+            if old != max_goal {
+                dbg!(&max_goal);
+            }
         }
 
         prev.set((y * width + x) as usize, true);
@@ -67,128 +63,25 @@ fn find_longest_path_bitvec(input: &[Vec<char>], start: Point2d, part2: bool) ->
             }
         }
         for (dx, dy) in [(1, 0), (-1, 0), (0, 1), (0, -1)] {
-            pq.push((steps + 1, x + dx, y + dy, prev.clone()));
-        }
-    }
-
-    max_goal
-}
-
-fn find_longest_path_graph(input: &[Vec<char>], start: Point2d, part2: bool) -> u64 {
-    //let mut pq = BinaryHeap::new();
-    let mut pq = Vec::new();
-
-    pq.push((0, start.0, start.1, None));
-
-    //let mut visited: HashMap<(i16, i16), (u64, Option<(i64, i64)>)> = HashMap::new();
-
-    //let mut goal_paths = Vec::new();
-    let mut max_goal = 0u64;
-    //let mut cur_max = HashMap::new();
-
-    let mut graph = Graph::<Point2d, ()>::new();
-
-    while let Some((steps, x, y, prev)) = pq.pop() {
-        if x < 0 || x >= input[0].len() as i16 || y < 0 || y >= input.len() as i16 {
-            continue;
-        }
-        let cur = input[y as usize][x as usize];
-        if cur == '#' {
-            continue;
-        }
-        if y == input.len() as i16 - 1 {
-            //goal_paths.push(visited.clone());
-            max_goal = max_goal.max(steps);
-            dbg!(&max_goal);
-            dbg!(&max_goal);
-        }
-        if was_there_be_before(&graph, prev, (x, y)) {
-            continue;
-        }
-
-        //match cur_max.entry((x, y)) {
-        //std::collections::hash_map::Entry::Occupied(mut o) => {
-        //if *o.get() < steps {
-        //*o.get_mut() = steps;
-        //} else {
-        //if *o.get() > steps + 100 {
-        //continue;
-        //}
-        //}
-        //}
-        //std::collections::hash_map::Entry::Vacant(v) => {
-        //v.insert(steps);
-        //}
-        //}
-
-        let node = graph.add_node((x, y));
-        if let Some(prev) = prev {
-            graph.add_edge(prev, node, ());
-        }
-
-        if !part2 {
-            match cur {
-                '>' => {
-                    if input[y as usize][x as usize + 1] != '#' {
-                        pq.push((steps + 1, x + 1, y, Some(node)));
-                        continue;
-                    }
-                }
-                '<' => {
-                    if input[y as usize][x as usize - 1] != '#' {
-                        pq.push((steps + 1, x - 1, y, Some(node)));
-                        continue;
-                    }
-                }
-                'v' => {
-                    if input[y as usize + 1][x as usize] != '#' {
-                        pq.push((steps + 1, x, y + 1, Some(node)));
-                        continue;
-                    }
-                }
-                '^' => {
-                    if input[y as usize - 1][x as usize] != '#' {
-                        pq.push((steps - 1, x, y - 1, Some(node)));
-                        continue;
-                    }
-                }
-                '.' => (),
-                a => panic!("Didn't expect to see {a}"),
+            let (nx, ny) = (x + dx, y + dy);
+            if nx >= 0
+                && nx < (input[0].len() as i16)
+                && ny >= 0
+                && ny < (input.len() as i16)
+                && input[ny as usize][nx as usize] != '#'
+                && !prev.get_unchecked((ny * width + nx) as usize)
+            {
+                pq.push((steps + 1, nx, ny, prev.clone()));
             }
         }
-        for (dx, dy) in [(1, 0), (-1, 0), (0, 1), (0, -1)] {
-            pq.push((steps + 1, x + dx, y + dy, Some(node)));
-        }
     }
 
     max_goal
-}
-
-fn was_there_be_before(
-    visited: &Graph<Point2d, ()>,
-    cur: Option<NodeIndex>,
-    needle: Point2d,
-) -> bool {
-    let Some(mut cur) = cur else {
-        return false;
-    };
-    while let Some((_, next)) = visited
-        .neighbors_directed(cur, Incoming)
-        .detach()
-        .next(visited)
-    {
-        if visited.node_weight(next) == Some(&needle) {
-            return true;
-        }
-        cur = next;
-    }
-    false
 }
 
 fn main() -> anyhow::Result<()> {
     let input = include_str!("../input");
     //let input = include_str!("../example1");
-    //5450
 
     let input = input
         .lines()
@@ -197,48 +90,15 @@ fn main() -> anyhow::Result<()> {
         .collect_vec();
 
     let start: Point2d = (input[0].iter().position(|&c| c == '.').unwrap() as i16, 0);
-    dbg!(&start);
 
-    let max = find_longest_path_bitvec(&input, start, true);
-    dbg!(&max);
-    //let max = find_longest_path_graph(&input, start, true);
-    //dbg!(&max);
-    //let part1 = paths.iter().find_map(|(pos, (dist, _))| {
-    //if pos.1 == input.len() as i16 - 1 {
-    //Some(dist)
-    //} else {
-    //None
-    //}
-    //});
-    //dbg!(&part1);
+    let part1 = find_longest_path_bitvec(&input, start, false);
+    dbg!(&part1);
 
-    //let longest = paths.iter().map(|paths|
-    //paths.iter()
-    //.find(|(pos, (_dist, _))| pos.1 == input.len() as i16 - 1)
-    //.unwrap()).max_by_key(|paths);
-
-    //let mut cur = longest.1;
-    //let mut copy = input.clone();
-    //copy[longest.0 .1 as usize][longest.0 .0 as usize] = '♡';
-    //while let (_, Some(prev)) = cur {
-    //copy[prev.1 as usize][prev.0 as usize] = '♡';
-    //cur = &paths[&prev];
-    //}
-    //plot(&input);
-    //plot(&copy);
-
-    //let mut copy = input.clone();
-    //for y in 0..input.len() {
-    //for x in 0..input[0].len() {
-    //if paths.contains_key(&(x as i16, y as i16)) {
-    //copy[y][x] = '_';
-    //}
-    //}
-    //}
-    //plot(&copy);
-
-    //let part2 = part2.0;
-    //dbg!(&part2);
+    // took more than 1h26min to find the solution but wasn't done maximizing (but didn't add the
+    // nx/ny optimization). Next idea would have been to take a maximum subset of the junctions to
+    // form a round tour
+    let part2 = find_longest_path_bitvec(&input, start, true);
+    dbg!(&part2);
 
     Ok(())
 }
