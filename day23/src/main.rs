@@ -100,7 +100,9 @@ fn main() -> anyhow::Result<()> {
 
     // took more than 1h26min to find the solution but wasn't done maximizing (but didn't add the
     // nx/ny optimization). Next idea would have been to take a maximum subset of the junctions to
-    // form a round tour
+    // form a round tour (when connecting end to start)
+    // Current version finds maximum in 11min though not finished after 27min, should have really
+    // used the condensed graph
     let part2 = find_longest_path_bitvec(&input, start, true);
     dbg!(&part2);
 
