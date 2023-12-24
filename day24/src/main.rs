@@ -151,12 +151,12 @@ fn main() -> anyhow::Result<()> {
                         let y_is_zero = rotation_z * dir;
                         debug_assert!(y_is_zero.y.abs() < 1e-3);
 
-                        let rotation_x =
+                        let rotation_y =
                             DMat3::from_rotation_y(unit_z.xz().angle_between(y_is_zero.xz()));
-                        let xy_is_zero = rotation_x * y_is_zero;
+                        let xy_is_zero = rotation_y * y_is_zero;
                         debug_assert!(xy_is_zero.x.abs() < 1e-3);
                         debug_assert!(xy_is_zero.y.abs() < 1e-3);
-                        let rotation = rotation_x * rotation_z;
+                        let rotation = rotation_y * rotation_z;
 
                         let dir_rotated = rotation * dir;
                         debug_assert!(dir_rotated.x.abs() < 1e-3);
@@ -168,8 +168,9 @@ fn main() -> anyhow::Result<()> {
                         let mut real_intersections = None;
                         let mut common_intersection: Option<DVec2> = None;
                         let mut counter = 0u64;
-                        for (a, b) in grains.iter().tuple_windows() {
-                            let arot = a.rotate(&rotation);
+                        let a = grains[0];
+                        let arot = a.rotate(&rotation);
+                        for b in grains.iter().skip(1) {
                             let brot = b.rotate(&rotation);
                             if let Some((t, intersection)) = arot.intersects_xy(&brot) {
                                 //dbg!(&intersection);
@@ -181,7 +182,7 @@ fn main() -> anyhow::Result<()> {
                                 }
 
                                 if let Some(common_intersection) = common_intersection {
-                                    if (common_intersection - intersection).length_squared() > 1e-3
+                                    if (common_intersection - intersection).length_squared() > 100.0
                                     {
                                         //println!("intersection not match");
                                         continue 'outer;
@@ -194,6 +195,9 @@ fn main() -> anyhow::Result<()> {
                                 let bn = b.v.normalize();
                                 // parallel / antiparallel
                                 if (an - bn).length() < 1e-3 || (an + bn).length() < 1e-3 {
+                                    dbg!(&an);
+                                    dbg!(&bn);
+                                    
                                     //continue;
                                 } else {
                                     //println!("no interseciton");
@@ -234,7 +238,7 @@ fn main() -> anyhow::Result<()> {
     //let max_x = max_x as i64;
     //let min_y = min_y as i64;
     //let max_y = max_y as i64;
-    //let min_z = min_z as i64;
+    //let min_z= min_z as i64;
     //let max_z = max_z as i64;
 
     //let aabb = Aabb {
