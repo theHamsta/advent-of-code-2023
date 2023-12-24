@@ -1,20 +1,14 @@
 use std::{fmt::Display, ops::RangeInclusive};
 
-use glam::{dvec2, dvec3, DMat3, DVec2, DVec3, Vec3Swizzles};
-use itertools::{Itertools, MinMaxResult};
+use glam::{dvec3, DMat3, DVec2, DVec3, Vec3Swizzles};
+use indicatif::ProgressBar;
+use itertools::Itertools;
 use regex::Regex;
 
 #[derive(Clone, Copy, Debug, PartialEq)]
 struct HailGrain {
     p: glam::DVec3,
     v: glam::DVec3,
-}
-
-#[derive(Clone, Copy, Debug, PartialEq)]
-enum Plane {
-    XY,
-    XZ,
-    YZ,
 }
 
 #[derive(Clone, Debug, PartialEq)]
@@ -81,12 +75,7 @@ impl HailGrain {
     }
 }
 
-fn num_intersections_xy(
-    points: &[HailGrain],
-    x_range: (f64, f64),
-    y_range: (f64, f64),
-    plane: Plane,
-) -> usize {
+fn num_intersections_xy(points: &[HailGrain], x_range: (f64, f64), y_range: (f64, f64)) -> usize {
     points
         .iter()
         .tuple_combinations()
@@ -133,79 +122,99 @@ fn main() -> anyhow::Result<()> {
         &grains,
         (200000000000000., 400000000000000.),
         (200000000000000., 400000000000000.),
-        Plane::XY,
     );
     dbg!(&part1);
 
-    let search_max = 500;
+    let search_max = 5000i64;
 
-    let unit_y = dvec3(0.0, 1.0, 0.0);
     let unit_z = dvec3(0.0, 0.0, 1.0);
     let unit_x = dvec3(1.0, 0.0, 0.0);
-    let (times, real_intersections, dir) = // [((-3i64, 1),
-    // 2)].iter().copied()
-    ((-search_max)..=search_max)
-        .cartesian_product((-search_max)..=search_max)
-        .cartesian_product((-search_max)..=search_max)
-        .find_map(|((dx, dy), dz)| {
-            let dir = dvec3(dx as f64, dy as f64, dz as f64);
-            if dir.xy().length() < 1e-3 {
-                return None;
-            }
-            if dir.xz().length() < 1e-3 {
-                return None;
-            }
-            let dir = dir.normalize();
-            let rotation_z =
-                DMat3::from_rotation_z(unit_x.xy().angle_between(dir.xy())).transpose();
-            let y_is_zero = rotation_z * dir;
-            assert!(y_is_zero.y.abs() < 1e-3);
-
-            let rotation_x = DMat3::from_rotation_y(unit_z.xz().angle_between(y_is_zero.xz()));
-            let xy_is_zero = rotation_x * y_is_zero;
-            assert!(xy_is_zero.x.abs() < 1e-3);
-            assert!(xy_is_zero.y.abs() < 1e-3);
-            let rotation = rotation_x * rotation_z;
-
-            let dir_rotated = rotation * dir;
-            assert!(dir_rotated.x.abs() < 1e-3);
-            assert!(dir_rotated.y.abs() < 1e-3);
-
-            let mut times = Vec::new();
-            let mut real_intersections = Vec::new();
-            let mut common_intersection: Option<DVec2> = None;
-            for (a, b) in grains.iter().tuple_windows() {
-                let arot = a.rotate(&rotation);
-                let brot = b.rotate(&rotation);
-                if let Some((t, intersection)) = arot.intersects_xy(&brot) {
-                    //dbg!(&intersection);
-                    times.push(t);
-                    real_intersections.push(a.at_time(t));
-                    if let Some(common_intersection) = common_intersection {
-                        if (common_intersection - intersection).length_squared() > 1e-3 {
-                            //println!("intersection not match");
-                            return None;
+    let bar = ProgressBar::new((search_max * 2 * 2 * 2 * search_max * search_max) as u64);
+    let mut max_intersections = 0u64;
+    let (times, real_intersections, dir) = (0i64..)
+        .find_map(|h| {
+            println!("{h}");
+            for dx in -h..=h {
+                for dy in -(h - dx.abs())..=(h - dx.abs()) {
+                    'outer: for dz in -(h - dx.abs() - dy.abs())..=(h - dx.abs() - dy.abs()) {
+                        bar.inc(1);
+                        let dir = dvec3(dx as f64, dy as f64, dz as f64);
+                        if dir.xy().length() < 1e-3 {
+                            continue;
                         }
-                    } else {
-                        common_intersection = Some(intersection);
-                    }
-                } else {
-                    let an = a.v.normalize();
-                    let bn = b.v.normalize();
-                    // parallel / antiparallel
-                    if (an - bn).length() < 1e-3 || (an + bn).length() < 1e-3 {
-                        continue;
-                    } else {
-                        //println!("no interseciton");
-                        return None;
+                        if dir.xz().length() < 1e-3 {
+                            continue;
+                        }
+                        let dir = dir.normalize();
+                        let rotation_z =
+                            DMat3::from_rotation_z(unit_x.xy().angle_between(dir.xy())).transpose();
+                        let y_is_zero = rotation_z * dir;
+                        debug_assert!(y_is_zero.y.abs() < 1e-3);
+
+                        let rotation_x =
+                            DMat3::from_rotation_y(unit_z.xz().angle_between(y_is_zero.xz()));
+                        let xy_is_zero = rotation_x * y_is_zero;
+                        debug_assert!(xy_is_zero.x.abs() < 1e-3);
+                        debug_assert!(xy_is_zero.y.abs() < 1e-3);
+                        let rotation = rotation_x * rotation_z;
+
+                        let dir_rotated = rotation * dir;
+                        debug_assert!(dir_rotated.x.abs() < 1e-3);
+                        debug_assert!(dir_rotated.y.abs() < 1e-3);
+
+                        //let mut times = Vec::new();
+                        //let mut real_intersections = Vec::new();
+                        let mut times = None;
+                        let mut real_intersections = None;
+                        let mut common_intersection: Option<DVec2> = None;
+                        let mut counter = 0u64;
+                        for (a, b) in grains.iter().tuple_windows() {
+                            let arot = a.rotate(&rotation);
+                            let brot = b.rotate(&rotation);
+                            if let Some((t, intersection)) = arot.intersects_xy(&brot) {
+                                //dbg!(&intersection);
+                                //times.push(t);
+                                //real_intersections.push(a.at_time(t));
+                                if times.is_none() {
+                                    times = Some(t);
+                                    real_intersections = Some(a.at_time(t));
+                                }
+
+                                if let Some(common_intersection) = common_intersection {
+                                    if (common_intersection - intersection).length_squared() > 1e-3
+                                    {
+                                        //println!("intersection not match");
+                                        continue 'outer;
+                                    }
+                                } else {
+                                    common_intersection = Some(intersection);
+                                }
+                            } else {
+                                let an = a.v.normalize();
+                                let bn = b.v.normalize();
+                                // parallel / antiparallel
+                                if (an - bn).length() < 1e-3 || (an + bn).length() < 1e-3 {
+                                    //continue;
+                                } else {
+                                    //println!("no interseciton");
+                                    continue 'outer;
+                                }
+                            }
+                            counter += 1;
+                            if counter > max_intersections {
+                                max_intersections = counter;
+                                println!("{max_intersections}/{}", grains.len() - 1);
+                            }
+                        }
+                        //common_intersection.map(|c| (rotation.transpose() * c, (dx, dy, dz)))
+                        return Some((times.unwrap(), real_intersections.unwrap(), (dx, dy, dz)));
                     }
                 }
             }
-            //common_intersection.map(|c| (rotation.transpose() * c, (dx, dy, dz)))
-            Some((times, real_intersections, (dx, dy, dz)))
+            None
         })
         .unwrap();
-    let pos = real_intersections[0] - times[0] * dvec3(dir.0 as f64, dir.1 as f64, dir.2 as f64);
+    let pos = real_intersections - times * dvec3(dir.0 as f64, dir.1 as f64, dir.2 as f64);
     dbg!(&dir);
     //dbg!(&real_intersections);
     //dbg!(&times);
