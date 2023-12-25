@@ -1,3 +1,4 @@
+use rayon::prelude::*;
 use std::{fmt::Display, ops::RangeInclusive};
 
 use glam::{dvec3, DMat3, DVec2, DVec3, Vec3Swizzles};
@@ -26,6 +27,21 @@ impl Display for HailGrain {
             self.p.x, self.p.y, self.p.z, self.v.x, self.v.y, self.v.z
         )
     }
+}
+
+#[repr(C)]
+struct Input {
+    x: *const f32,
+    y: *const f32,
+    z: *const f32,
+    dx: *const f32,
+    dy: *const f32,
+    dz: *const f32,
+    size: u32,
+}
+
+extern "C" {
+    fn find_dir(input: Input, max_per_coordinate: i32);
 }
 
 impl HailGrain {
@@ -125,19 +141,48 @@ fn main() -> anyhow::Result<()> {
     );
     dbg!(&part1);
 
+    let mut x = Vec::new();
+    let mut y = Vec::new();
+    let mut z = Vec::new();
+    let mut dx = Vec::new();
+    let mut dy = Vec::new();
+    let mut dz = Vec::new();
+    grains.iter().for_each(|g| {
+        x.push(g.p.x as f32);
+        y.push(g.p.y as f32);
+        z.push(g.p.z as f32);
+        dx.push(g.v.x as f32);
+        dy.push(g.v.y as f32);
+        dz.push(g.v.z as f32);
+    });
+
+    unsafe {
+        find_dir(
+            Input {
+                x: x.as_ptr(),
+                y: y.as_ptr(),
+                z: z.as_ptr(),
+                dx: dx.as_ptr(),
+                dy: dy.as_ptr(),
+                dz: dz.as_ptr(),
+                size: x.len() as u32,
+            },
+            1024*256,
+        );
+    }
+
     let search_max = 5000i64;
 
     let unit_z = dvec3(0.0, 0.0, 1.0);
     let unit_x = dvec3(1.0, 0.0, 0.0);
-    let bar = ProgressBar::new((search_max * 2 * 2 * 2 * search_max * search_max) as u64);
-    let mut max_intersections = 0u64;
-    let (times, real_intersections, dir) = (0i64..)
-        .find_map(|h| {
+    //let bar = ProgressBar::new((search_max * 2 * 2 * 2 * search_max * search_max) as u64);
+    let (times, real_intersections, dir) = (672i64..2000)
+        .into_par_iter()
+        .find_map_any(|h| {
             println!("{h}");
             for dx in -h..=h {
                 for dy in -(h - dx.abs())..=(h - dx.abs()) {
                     'outer: for dz in -(h - dx.abs() - dy.abs())..=(h - dx.abs() - dy.abs()) {
-                        bar.inc(1);
                         let dir = dvec3(dx as f64, dy as f64, dz as f64);
                         if dir.xy().length() < 1e-3 {
                             continue;
@@ -167,7 +212,6 @@ fn main() -> anyhow::Result<()> {
                         let mut times = None;
                         let mut real_intersections = None;
                         let mut common_intersection: Option<DVec2> = None;
-                        let mut counter = 0u64;
                         let a = grains[0];
                         let arot = a.rotate(&rotation);
                         for b in grains.iter().skip(1) {
@@ -197,17 +241,12 @@ fn main() -> anyhow::Result<()> {
                                 if (an - bn).length() < 1e-3 || (an + bn).length() < 1e-3 {
                                     dbg!(&an);
                                     dbg!(&bn);
-                                    
+
                                     //continue;
                                 } else {
                                     //println!("no interseciton");
                                     continue 'outer;
                                 }
-                            }
-                            counter += 1;
-                            if counter > max_intersections {
-                                max_intersections = counter;
-                                println!("{max_intersections}/{}", grains.len() - 1);
                             }
                         }
                         //common_intersection.map(|c| (rotation.transpose() * c, (dx, dy, dz)))
